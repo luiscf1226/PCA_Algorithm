@@ -18,14 +18,22 @@ func main() {
 		fmt.Println("Error:", err)
 		return
 	}
-
-	//calculate the mean and standard deviation
-	//each method will return a matrix
+	print("Matrix Received by file \n")
+	printMatrix(matrix)
+	//Implement first step 1 center and reduce normalized matrix
 	means := calculateColumnMeans(matrix)
 	stdDevs := calculateColumnStdDevs(matrix)
-
 	normalizedMatrix := normalizeMatrix(matrix, means, stdDevs)
+	print("Matrix Normalized \n")
 	printMatrix(normalizedMatrix)
+
+	//Second step 2 Correlation Matrix
+	correlationMatrix := calculateCorrelationMatrix(normalizedMatrix)
+	print("Correlation Matrix \n")
+	printMatrix(correlationMatrix)
+
+	//third step order by greatest to least vectors
+
 }
 
 // read csv file or return error if occured
@@ -113,9 +121,46 @@ func normalizeMatrix(matrix [][]float64, means, stdDevs []float64) [][]float64 {
 	return matrix
 }
 
-// Imprime una matriz
+// Print Matrix function
 func printMatrix(matrix [][]float64) {
 	for _, row := range matrix {
 		fmt.Println(row)
 	}
+}
+
+func calculateCorrelationMatrix(normalizedMatrix [][]float64) [][]float64 {
+	//get number of columns and initalize matrix
+	numCols := len(normalizedMatrix[0])
+	correlationMatrix := make([][]float64, numCols)
+	//get means from function
+	means := calculateColumnMeans(normalizedMatrix)
+
+	for i := 0; i < numCols; i++ {
+		correlationMatrix[i] = make([]float64, numCols)
+		for j := 0; j < numCols; j++ {
+			//for each value get correlation value for each matrix
+			correlation := calculateCorrelationValue(normalizedMatrix[i], normalizedMatrix[j], means[i], means[j])
+			correlationMatrix[i][j] = correlation
+		}
+	}
+	return correlationMatrix
+}
+
+func calculateCorrelationValue(col1, col2 []float64, mean1, mean2 float64) float64 {
+	//values for data points and formula
+	n := len(col1)
+	numerator := 0.0
+	denominator1 := 0.0
+	denominator2 := 0.0
+
+	for i := 0; i < n; i++ {
+		//get numerator by getting val1,val2 and substracting each by mean
+		numerator += (col1[i] - mean1) * (col2[i] - mean2)
+		//denominator is obtained by getting the value - mean to power of 2
+		denominator1 += math.Pow(col1[i]-mean1, 2)
+		denominator2 += math.Pow(col2[i]-mean2, 2)
+	}
+	//return correlation value with formula
+	correlation := numerator / (math.Sqrt(denominator1) * math.Sqrt(denominator2))
+	return correlation
 }
