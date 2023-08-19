@@ -50,6 +50,14 @@ func main() {
 	for _, vector := range vectors {
 		fmt.Println(vector)
 	}
+	//fourth step make eigen matrix from eigen vectors matrix
+	fmt.Println("Eigen matrix:")
+	eigenMatrix := calculateEigenMatrix(vectors)
+	printMatrix(eigenMatrix)
+	//fith step make PC matrix from nornmalized matrix, and eigen matrix
+	pcMatrix := calculatePCMatrix(normalizedMatrix, eigenMatrix)
+	fmt.Println("Principal Component matrix:")
+	printMatrix(pcMatrix)
 }
 
 // read csv file or return error if occured
@@ -247,4 +255,57 @@ func dotProduct(vector1, vector2 []float64) float64 {
 		result += vector1[i] * vector2[i]
 	}
 	return result
+}
+
+func calculateEigenMatrix(eigenVectors [][]float64) [][]float64 {
+	numCols := len(eigenVectors)
+	eigenMatrix := make([][]float64, numCols)
+	//transpose matrix change columns for rows
+	for i := 0; i < numCols; i++ {
+		//need to reserve space of rows of number of columns each
+		eigenMatrix[i] = make([]float64, numCols)
+		for j := 0; j < numCols; j++ {
+			eigenMatrix[i][j] = eigenVectors[j][i]
+		}
+	}
+	return eigenMatrix
+}
+
+func calculatePCMatrix(normalizedMatrix [][]float64, eigenMatrix [][]float64) [][]float64 {
+	//get number of rows and columnds
+	numRows := len(normalizedMatrix)
+	numCols := len(eigenMatrix)
+	pcMatrix := make([][]float64, numRows)
+
+	//set value to matrix from dot product with normalized and eigen matrix
+	for i := 0; i < numRows; i++ {
+		pcMatrix[i] = make([]float64, numCols)
+		rowX := rowToArray(normalizedMatrix, i)
+
+		for j := 0; j < numCols; j++ {
+			columnV := columnToArray(eigenMatrix, j)
+			valuedotProduct := dotProduct(rowX, columnV)
+			pcMatrix[i][j] = valuedotProduct
+		}
+	}
+
+	return pcMatrix
+}
+
+func columnToArray(matrix [][]float64, j int) []float64 {
+	//return column from matrix given a index
+	numRows := len(matrix)
+	array := make([]float64, numRows)
+	for i := 0; i < numRows; i++ {
+		array[i] = matrix[i][j]
+	}
+	return array
+}
+
+func rowToArray(matrix [][]float64, i int) []float64 {
+	// function to return row as an array given an index
+	numCols := len(matrix[i])
+	array := make([]float64, numCols)
+	copy(array, matrix[i])
+	return array
 }
