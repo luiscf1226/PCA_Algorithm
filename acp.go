@@ -13,7 +13,7 @@ import (
 
 const (
 	maxIter    = 1000
-	precision  = 1e-10
+	precision  = 1e-9 // value of precision for convergence
 	matrixSize = 5
 )
 
@@ -118,13 +118,13 @@ func readCSVFile(filePath string) ([][]float64, error) {
 
 func calculateColumnMeans(matrix [][]float64) []float64 {
 	means := make([]float64, len(matrix[0]))
-	//calculate the total by adding each value inside matrix
+	// Calculate the sum of each column
 	for _, row := range matrix {
 		for i, val := range row {
 			means[i] += val
 		}
 	}
-	//we then get means value for each column and devide by the total to get average
+	// Divide by the number of rows to get the average of each column
 	for i := range means {
 		means[i] /= float64(len(matrix))
 	}
@@ -132,38 +132,30 @@ func calculateColumnMeans(matrix [][]float64) []float64 {
 }
 
 func calculateColumnStdDevs(matrix [][]float64) []float64 {
-	//calculate column means again to get ready for standard deviation
 	means := calculateColumnMeans(matrix)
 	stdDevs := make([]float64, len(matrix[0]))
 	for _, row := range matrix {
 		for i, val := range row {
-			//calculate standard deviation used formula
-			//dv=squar root of actual (value-means)^2
 			stdDevs[i] += math.Pow(val-means[i], 2)
 		}
 	}
 	for i := range stdDevs {
-		//we then use the rest of formula
-		//dv=(method above)/total number of elements in matrix
-		stdDevs[i] = math.Sqrt(stdDevs[i] / float64(len(matrix)))
+		//standard deviation formula for each value
+		stdDevs[i] = math.Sqrt(stdDevs[i] / float64(len(matrix)-1))
 	}
 	return stdDevs
 }
 
-// Normalize using z score
-// this ensure data is represented mean between 0 and standard deviation 1
-
+// Normalize the matrix using z-score normalization
 func normalizeMatrix(matrix [][]float64, means, stdDevs []float64) [][]float64 {
 	normalizedMatrix := make([][]float64, len(matrix))
-	// this will reserve the rows in space from memory
 	for i := range matrix {
 		normalizedMatrix[i] = make([]float64, len(matrix[i]))
 		copy(normalizedMatrix[i], matrix[i])
 	}
-	//uses formula (value-meanValue)/standiard deviation value
+	// Subtract mean and divide by standard deviation for each value
 	for i, row := range normalizedMatrix {
 		for j, val := range row {
-
 			normalizedMatrix[i][j] = (val - means[j]) / stdDevs[j]
 		}
 	}
@@ -184,7 +176,8 @@ func calculateCorrelationMatrix(normalizedMatrix [][]float64) [][]float64 {
 		correlationMatrix[i] = make([]float64, numCols)
 		for j := 0; j < numCols; j++ {
 			//obtain correlation value for matrix
-			correlation := calculateCorrelationValue(getColumn(normalizedMatrix, i), getColumn(normalizedMatrix, j))
+			correlation := calculateCorrelationValue(getColumn(normalizedMatrix, i),
+				getColumn(normalizedMatrix, j))
 			correlationMatrix[i][j] = correlation
 		}
 	}
@@ -199,6 +192,7 @@ func getColumn(matrix [][]float64, colIndex int) []float64 {
 	return column
 }
 
+// function is simplified because normalized values are given from matrix
 func calculateCorrelationValue(col1, col2 []float64) float64 {
 	n := len(col1)
 	numerator := 0.0
@@ -221,64 +215,75 @@ func calculateCorrelationValue(col1, col2 []float64) float64 {
 }
 
 func calculateEigenvaluesAndEigenvectors(R [][]float64) ([]float64, [][]float64) {
+	//needa to receive matrix and return values in array and vectors in matrix
 	rows := len(R)
 	values := make([]float64, rows)
 	vectors := make([][]float64, rows)
-
+	//get vector randomly
 	for k := 0; k < rows; k++ {
 		vector := make([]float64, rows)
 		for j := 0; j < rows; j++ {
 			vector[j] = rand.Float64()
 		}
-		// vector magnitud needs to be = 1
+		//normalize vector
 		vector = normalizeVector(vector)
+		//vector needs to be multiplied by matrix for power iteration
 
 		for iter := 0; iter < maxIter; iter++ {
-
 			nextVector := multiplyMatrixVector(R, vector)
-
 			nextVector = normalizeVector(nextVector)
-			// Calculate the dot product which is eigen value from next vector
-			eigenvalue := dotProduct(nextVector, vector)
-
-			// eigen value cannot be less than precision
+			//eigen value formula using dot product
+			eigenvalue := dotProduct(nextVector, multiplyMatrixVector(R, nextVector))
+			//it cant be less than precision
 			if math.Abs(eigenvalue-values[k]) < precision {
 				break
 			}
-			//updates the vector
 			vector = nextVector
 		}
 
 		values[k] = dotProduct(multiplyMatrixVector(R, vector), vector)
 		vectors[k] = vector
-		//subtract eigen vector value and matrix in transposse by the value
-
+		//deflate matrix
+		//subtract product of the eigen vector
 		for i := 0; i < rows; i++ {
 			for j := 0; j < rows; j++ {
+				//makes sure next largest eigen value and vector are paired
 				R[i][j] -= values[k] * vectors[k][i] * vectors[k][j]
 			}
 		}
 	}
 
-	// slice table receives value and will order then
-	//greatest to lowest
-	sort.SliceStable(values, func(i, j int) bool {
-		return values[i] > values[j]
+	// Sort eigenvalues and corresponding eigenvectors
+	//define struct to pair eigena value to its vector
+	eigenPairs := make([]struct {
+		value  float64
+		vector []float64
+	}, rows)
+	for i := range values {
+		eigenPairs[i].value = values[i]
+		eigenPairs[i].vector = vectors[i]
+	}
+	//sorts in ascending ( greates to least)
+	//worting eigen values results in sorting the vectors
+	sort.SliceStable(eigenPairs, func(i, j int) bool {
+		return eigenPairs[i].value > eigenPairs[j].value
 	})
+	for i := range values {
+		values[i] = eigenPairs[i].value
+		vectors[i] = eigenPairs[i].vector
+	}
 
 	return values, vectors
 }
 
 func normalizeVector(vector []float64) []float64 {
-	//get magnitude from function dot product squared
+	//magnitud formula using dot product
 	magnitude := math.Sqrt(dotProduct(vector, vector))
-	//each vector needs to be divided by magnitud to be normalized
 	for i := range vector {
 		vector[i] /= magnitude
 	}
 	return vector
 }
-
 func multiplyMatrixVector(matrix [][]float64, vector []float64) []float64 {
 	rows, cols := len(matrix), len(matrix[0])
 	result := make([]float64, rows)
