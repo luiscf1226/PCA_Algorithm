@@ -13,7 +13,7 @@ import (
 
 const (
 	maxIter    = 1000
-	precision  = 1e-9 // value of precision for convergence
+	precision  = 1e-10 // value of precision for convergence
 	matrixSize = 5
 )
 
@@ -30,9 +30,7 @@ func main() {
 	printMatrix(matrix)
 	//Implement first step 1 center and reduce normalized matrix
 	//obtain matrix by calculating mean and deviation standard to normalize
-	means := calculateColumnMeans(matrix)
-	stdDevs := calculateColumnStdDevs(matrix)
-	normalizedMatrix := normalizeMatrix(matrix, means, stdDevs)
+	normalizedMatrix := normalizeMatrix(matrix)
 	print("1. Matrix Normalized \n")
 	printMatrix(normalizedMatrix)
 
@@ -48,9 +46,10 @@ func main() {
 	//print eigen and vector values
 	fmt.Println("3. Eigenvalues:", values)
 	fmt.Println("4. Eigenvectors:")
-	printMatrix(vectors)
+	vectorsTranspose := transposeMatrix(vectors)
+	printMatrix(vectorsTranspose)
 	//fith step make PC matrix from nornmalized matrix, and eigen matrix
-	pcMatrix := calculatePCMatrix(normalizedMatrix, vectors)
+	pcMatrix := calculatePCMatrix(normalizedMatrix, vectorsTranspose)
 	fmt.Println("5. Principal Component matrix:")
 	printMatrix(pcMatrix)
 	//six stepS
@@ -58,7 +57,7 @@ func main() {
 	fmt.Println("6. Individual Qualities Matrix:")
 	printMatrix(individualmatrix)
 	//seventh step make the correlation matrix
-	coordinateValues, coordinatesMatrix := calculateAutoValuesandVectors(pcMatrix)
+	coordinateValues, coordinatesMatrix := calculateEigenvaluesAndVectors(pcMatrix)
 	fmt.Println("Coordinates Values from Eigen values:")
 	for _, vector := range coordinateValues {
 		fmt.Println(vector)
@@ -66,11 +65,11 @@ func main() {
 	fmt.Println("7. Coordinates Matrix:")
 	printMatrix(coordinatesMatrix)
 	//eight step quality matrix
-	qualityMatrix := calculcateQualityMatrix(coordinateValues, coordinatesMatrix)
+	qualityMatrix := calculateQualityV(vectors, coordinatesMatrix)
 	fmt.Println("8. Quality Matrix: ")
 	printMatrix(qualityMatrix)
 	//nineth step inercia vector
-	inerciaV := calculateInerciaVector(coordinateValues)
+	inerciaV := calculateInertiaVector(values)
 	fmt.Println("9. Inercia Vector: ")
 	for _, vector := range inerciaV {
 		fmt.Println(vector)
@@ -118,48 +117,70 @@ func readCSVFile(filePath string) ([][]float64, error) {
 
 func calculateColumnMeans(matrix [][]float64) []float64 {
 	means := make([]float64, len(matrix[0]))
+
 	// Calculate the sum of each column
 	for _, row := range matrix {
 		for i, val := range row {
 			means[i] += val
 		}
 	}
+
 	// Divide by the number of rows to get the average of each column
 	for i := range means {
 		means[i] /= float64(len(matrix))
 	}
+
 	return means
 }
 
 func calculateColumnStdDevs(matrix [][]float64) []float64 {
+	if len(matrix) == 0 {
+		return nil
+	}
+
 	means := calculateColumnMeans(matrix)
 	stdDevs := make([]float64, len(matrix[0]))
+
 	for _, row := range matrix {
 		for i, val := range row {
 			stdDevs[i] += math.Pow(val-means[i], 2)
 		}
 	}
+
 	for i := range stdDevs {
-		//standard deviation formula for each value
-		stdDevs[i] = math.Sqrt(stdDevs[i] / float64(len(matrix)-1))
+		// standard deviation formula for each value
+		stdDevs[i] = math.Sqrt(stdDevs[i] / float64(len(matrix)-1)) // Remember the note about n-1 vs n
 	}
+
 	return stdDevs
 }
 
 // Normalize the matrix using z-score normalization
-func normalizeMatrix(matrix [][]float64, means, stdDevs []float64) [][]float64 {
+func normalizeMatrix(matrix [][]float64) [][]float64 {
+	if len(matrix) == 0 {
+		return nil
+	}
+
+	means := calculateColumnMeans(matrix)
+	stdDevs := calculateColumnStdDevs(matrix)
+
 	normalizedMatrix := make([][]float64, len(matrix))
 	for i := range matrix {
 		normalizedMatrix[i] = make([]float64, len(matrix[i]))
-		copy(normalizedMatrix[i], matrix[i])
-	}
-	// Subtract mean and divide by standard deviation for each value
-	for i, row := range normalizedMatrix {
-		for j, val := range row {
+		// Subtract mean and divide by standard deviation for each value
+		for j, val := range matrix[i] {
 			normalizedMatrix[i][j] = (val - means[j]) / stdDevs[j]
 		}
 	}
 	return normalizedMatrix
+}
+
+// print array
+func printArray(arr []float64) {
+	for _, val := range arr {
+		fmt.Printf("%f ", val)
+	}
+	fmt.Println() // adds a new line at the end
 }
 
 // Print Matrix function
@@ -175,7 +196,7 @@ func calculateCorrelationMatrix(normalizedMatrix [][]float64) [][]float64 {
 	for i := 0; i < numCols; i++ {
 		correlationMatrix[i] = make([]float64, numCols)
 		for j := 0; j < numCols; j++ {
-			//obtain correlation value for matrix
+			// Obtain correlation value for matrix
 			correlation := calculateCorrelationValue(getColumn(normalizedMatrix, i),
 				getColumn(normalizedMatrix, j))
 			correlationMatrix[i][j] = correlation
@@ -192,28 +213,27 @@ func getColumn(matrix [][]float64, colIndex int) []float64 {
 	return column
 }
 
-// function is simplified because normalized values are given from matrix
+// simplify formula
 func calculateCorrelationValue(col1, col2 []float64) float64 {
 	n := len(col1)
 	numerator := 0.0
 	denominator1 := 0.0
 	denominator2 := 0.0
-	//get both denominators from both columns
+	// Get both denominators from both columns
 	for i := 0; i < n; i++ {
 		numerator += col1[i] * col2[i]
-		denominator1 += math.Pow(col1[i], 2)
-		denominator2 += math.Pow(col2[i], 2)
+		denominator1 += col1[i] * col1[i]
+		denominator2 += col2[i] * col2[i]
 	}
 
-	// division cant be equals to 0
+	// Division can't be equal to 0
 	if denominator1 == 0 || denominator2 == 0 {
 		return 0
 	}
-	//use correlation formula
+	// Use correlation formula
 	correlation := numerator / (math.Sqrt(denominator1) * math.Sqrt(denominator2))
 	return correlation
 }
-
 func calculateEigenvaluesAndEigenvectors(R [][]float64) ([]float64, [][]float64) {
 	//needa to receive matrix and return values in array and vectors in matrix
 	rows := len(R)
@@ -225,17 +245,14 @@ func calculateEigenvaluesAndEigenvectors(R [][]float64) ([]float64, [][]float64)
 		for j := 0; j < rows; j++ {
 			vector[j] = rand.Float64()
 		}
-		//normalize vector
 		vector = normalizeVector(vector)
-		//vector needs to be multiplied by matrix for power iteration
 
 		for iter := 0; iter < maxIter; iter++ {
 			nextVector := multiplyMatrixVector(R, vector)
 			nextVector = normalizeVector(nextVector)
-			//eigen value formula using dot product
-			eigenvalue := dotProduct(nextVector, multiplyMatrixVector(R, nextVector))
-			//it cant be less than precision
-			if math.Abs(eigenvalue-values[k]) < precision {
+
+			// Check for convergence of eigenvector
+			if vectorDiff(nextVector, vector) < precision {
 				break
 			}
 			vector = nextVector
@@ -243,6 +260,7 @@ func calculateEigenvaluesAndEigenvectors(R [][]float64) ([]float64, [][]float64)
 
 		values[k] = dotProduct(multiplyMatrixVector(R, vector), vector)
 		vectors[k] = vector
+
 		//deflate matrix
 		//subtract product of the eigen vector
 		for i := 0; i < rows; i++ {
@@ -276,6 +294,15 @@ func calculateEigenvaluesAndEigenvectors(R [][]float64) ([]float64, [][]float64)
 	return values, vectors
 }
 
+// Helper function to check difference between two vectors
+func vectorDiff(v1, v2 []float64) float64 {
+	diff := 0.0
+	for i := range v1 {
+		diff += (v1[i] - v2[i]) * (v1[i] - v2[i])
+	}
+	return math.Sqrt(diff)
+}
+
 func normalizeVector(vector []float64) []float64 {
 	//magnitud formula using dot product
 	magnitude := math.Sqrt(dotProduct(vector, vector))
@@ -284,6 +311,7 @@ func normalizeVector(vector []float64) []float64 {
 	}
 	return vector
 }
+
 func multiplyMatrixVector(matrix [][]float64, vector []float64) []float64 {
 	rows, cols := len(matrix), len(matrix[0])
 	result := make([]float64, rows)
@@ -293,7 +321,6 @@ func multiplyMatrixVector(matrix [][]float64, vector []float64) []float64 {
 			result[i] += matrix[i][j] * vector[j]
 		}
 	}
-
 	return result
 }
 
@@ -307,52 +334,74 @@ func dotProduct(vector1, vector2 []float64) float64 {
 	return result
 }
 
+func transposeMatrix(matrix [][]float64) [][]float64 {
+	numRows := len(matrix)
+	if numRows == 0 {
+		return [][]float64{}
+	}
+	numCols := len(matrix[0])
+
+	transposed := make([][]float64, numCols)
+	for i := range transposed {
+		transposed[i] = make([]float64, numRows)
+		//change columns to rows
+		for j := range transposed[i] {
+			transposed[i][j] = matrix[j][i]
+		}
+	}
+	return transposed
+}
 func calculatePCMatrix(normalizedMatrix [][]float64, eigenMatrix [][]float64) [][]float64 {
-	//obtains the len of the normalizedMatrix
+	// Obtains the length of the normalizedMatrix
 	numRows := len(normalizedMatrix)
-	//obtains the len of the eigenMatrix
+
+	// Obtains the length of the eigenMatrix
 	numCols := len(eigenMatrix[0])
+
 	pcMatrix := make([][]float64, numRows)
 	for i := 0; i < numRows; i++ {
-		//reserve the memory for the new matrix
+		// Reserve the memory for the new matrix
 		pcMatrix[i] = make([]float64, numCols)
+
 		for j := 0; j < numCols; j++ {
 			sum := 0.0
-			//calculates the sumatory using the normalizedMatrix and the eigenMatrix
+			// Calculates the summation using the normalizedMatrix and the eigenMatrix
 			for k := range normalizedMatrix[i] {
 				sum += normalizedMatrix[i][k] * eigenMatrix[k][j]
 			}
-			//asigns the value calculated to the item of the matrix
+
+			// Assigns the calculated value to the item of the matrix
 			pcMatrix[i][j] = sum
 		}
 	}
-	//returns the created matrix
+
+	// Returns the created matrix
 	return pcMatrix
 }
 
 func calculateIndividualMatrix(principalMatrix [][]float64, normalizedMatrix [][]float64) [][]float64 {
 	numRows := len(normalizedMatrix)
 	numCols := len(normalizedMatrix[0])
-	denominator := 0.0
 
-	//calculates the denominator that will be the same for all the next iterations
-	for i := 0; i < numRows; i++ {
-		for j := 0; j < numCols; j++ {
-			denominator += math.Pow(normalizedMatrix[i][j], 2)
-		}
-	}
-	//reserve the memory for the new matrix
 	individualMatrix := make([][]float64, numRows)
 
 	for i := 0; i < numRows; i++ {
+		denominator := 0.0
+		// denominator for the row
+		for k := 0; k < numCols; k++ {
+			denominator += math.Pow(normalizedMatrix[i][k], 2)
+		}
+
 		individualMatrix[i] = make([]float64, numCols)
 		for j := 0; j < numCols; j++ {
-			//obtains the numerator in each iteration
+			// Calculate the squared value for the current entry in the principalMatrix
 			matrixCvalue := math.Pow(principalMatrix[i][j], 2)
-			//asigns the calculated value to the item of the new matrix
+
+			// Assign value
 			individualMatrix[i][j] = matrixCvalue / denominator
 		}
 	}
+
 	return individualMatrix
 }
 
@@ -377,18 +426,6 @@ func rowToArray(matrix [][]float64, i int) []float64 {
 	return array
 }
 
-func calculateAutoValuesandVectors(pcMatrix [][]float64) ([]float64, [][]float64) {
-	correlationPCmatrix := calculateCorrelationMatrix(pcMatrix)
-	//obtains a list of proper values and proper vectors just calling an existing function
-	values, vectors := calculateEigenvaluesAndEigenvectors(correlationPCmatrix)
-	eigenMatrix := vectors
-	//receives the coordinatesMatrix
-	coordinatesMatrix := calculateCoordinatesMatrix(pcMatrix, eigenMatrix)
-	//returns the proper values and the CoordinatesMatrix
-	return values, coordinatesMatrix
-
-}
-
 func calculateCoordinatesMatrix(pcMatrix, eigenMatrix [][]float64) [][]float64 {
 	numRows := len(pcMatrix)
 	numCols := len(eigenMatrix[0])
@@ -406,32 +443,48 @@ func calculateCoordinatesMatrix(pcMatrix, eigenMatrix [][]float64) [][]float64 {
 	//returns the coordinatesMatrix
 	return coordinatesMatrix
 }
-
-func calculcateQualityMatrix(vectores []float64, coordinatesMatrix [][]float64) [][]float64 {
-	numRows := len(coordinatesMatrix)
-	numCols := len(coordinatesMatrix[0])
-	qualityMatrix := make([][]float64, numRows)
-
-	//use formula to get each value using coordinate matrix and proper vector
-	for i := 0; i < numRows; i++ {
-		qualityMatrix[i] = make([]float64, numCols)
-		for j := 0; j < numCols; j++ {
-			//asgns the value to the new matrix item
-			qualityMatrix[i][j] = (((math.Pow(coordinatesMatrix[i][j], 2)) / (vectores[j])) * 100)
-		}
-	}
-	//returns the quality matrix
-	return qualityMatrix
+func calculateEigenvaluesAndVectors(pcMatrix [][]float64) ([]float64, [][]float64) {
+	correlationPCmatrix := calculateCorrelationMatrix(pcMatrix)
+	// Obtains a list of eigenvalues and eigenvectors just calling an existing function
+	values, eigenMatrix := calculateEigenvaluesAndEigenvectors(correlationPCmatrix)
+	// Receives the coordinatesMatrix
+	coordinatesMatrix := calculateCoordinatesMatrix(pcMatrix, eigenMatrix)
+	// Returns the eigenvalues and the CoordinatesMatrix
+	return values, coordinatesMatrix
 }
 
-func calculateInerciaVector(vectores []float64) []float64 {
-	//obtains the len of the vector and reserves its memory
-	m := float64(len(vectores))
-	inerciaVector := make([]float64, len(vectores))
-	for i := 0; i < len(vectores); i++ {
-		//in each iteration, asigns the value using the given formula
-		inerciaVector[i] = 100 * (vectores[i] / m)
+func calculateQualityV(vectores, coordinatesMatrix [][]float64) [][]float64 {
+
+	// Inicializar matriz S
+	var S = make([][]float64, len(vectores))
+	for i := range S {
+		S[i] = make([]float64, len(vectores))
 	}
-	//returns the vector
+
+	// Multiplicar T * V^T
+	for i := 0; i < len(S); i++ {
+		for j := 0; j < len(S); j++ {
+			for k := 0; k < len(vectores); k++ {
+				S[i][j] += coordinatesMatrix[i][k] * vectores[j][k]
+			}
+		}
+	}
+
+	return S
+}
+func calculateInertiaVector(valoresPropios []float64) []float64 {
+
+	// Obtener longitud de vectores
+	m := float64(len(valoresPropios))
+
+	// Inicializar vector de inercias
+	inerciaVector := make([]float64, len(valoresPropios))
+
+	// Calcular inercias
+	for i, valorPropio := range valoresPropios {
+		inerciaVector[i] = (valorPropio / m) * 100
+	}
+
 	return inerciaVector
+
 }
