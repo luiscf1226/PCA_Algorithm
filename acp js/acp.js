@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { EigenvalueDecomposition } = require('ml-matrix');
+const PCA = require('ml-pca').PCA;
 
 leerCSV();
 
@@ -56,7 +57,9 @@ async function leerCSV() {
     printMatriz(vectoresPropios);
 
     // 5. CALCULAR LOS COMPONENTES PRINCIPALES
-    const pc = calcMatrizPC(matrizNormalizada, vectoresPropios);
+    const pca = new PCA(matrizNormalizada);
+    const pc = pca.predict(matrizNormalizada).to2DArray(); // usando librería de machine learning
+    //const pc = calcMatrizPC(matrizNormalizada, vectoresPropios);
     console.log("\n5. Cálculo de componentes principales");
     printMatriz(pc);
 
@@ -85,7 +88,7 @@ async function leerCSV() {
     console.log(expVariance);
     const endTime = Date.now();
     const timeElapsed = endTime - startTime; // in milliseconds
-    console.log("Tiempo de ejecucion: "+timeElapsed)
+    console.log("Tiempo de ejecucion: " + timeElapsed)
 }
 
 function calcAvg(matriz) {
