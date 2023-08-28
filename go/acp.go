@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -18,7 +19,7 @@ const (
 )
 
 func main() {
-
+	startTime := time.Now()
 	filePath := "EjemploEstudiantes.csv"
 	//from file path read file or return error
 	matrix, err := readCSVFile(filePath)
@@ -74,6 +75,10 @@ func main() {
 	for _, vector := range inerciaV {
 		fmt.Println(vector)
 	}
+	// Calculo el tiempo que ha transcurrido desde el inicio
+	elapsedTime := time.Since(startTime)
+
+	fmt.Printf("El código tardó %s en ejecutarse.\n", elapsedTime)
 }
 
 // read csv file or return error if occured
@@ -175,14 +180,6 @@ func normalizeMatrix(matrix [][]float64) [][]float64 {
 	return normalizedMatrix
 }
 
-// print array
-func printArray(arr []float64) {
-	for _, val := range arr {
-		fmt.Printf("%f ", val)
-	}
-	fmt.Println() // adds a new line at the end
-}
-
 // Print Matrix function
 func printMatrix(matrix [][]float64) {
 	for _, row := range matrix {
@@ -272,7 +269,7 @@ func calculateEigenvaluesAndEigenvectors(R [][]float64) ([]float64, [][]float64)
 	}
 
 	// Sort eigenvalues and corresponding eigenvectors
-	//define struct to pair eigena value to its vector
+	//define struct to pair eigen value to its vector
 	eigenPairs := make([]struct {
 		value  float64
 		vector []float64
@@ -282,7 +279,7 @@ func calculateEigenvaluesAndEigenvectors(R [][]float64) ([]float64, [][]float64)
 		eigenPairs[i].vector = vectors[i]
 	}
 	//sorts in ascending ( greates to least)
-	//worting eigen values results in sorting the vectors
+	//sorting eigen values results in sorting the vectors
 	sort.SliceStable(eigenPairs, func(i, j int) bool {
 		return eigenPairs[i].value > eigenPairs[j].value
 	})

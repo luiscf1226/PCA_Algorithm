@@ -4,6 +4,8 @@ const { EigenvalueDecomposition } = require('ml-matrix');
 leerCSV();
 
 async function leerCSV() {
+    //start time
+    const startTime = Date.now();
     const data = await fs.promises.readFile('EjemploEstudiantes.csv', 'utf-8');
     const rows = data.split('\n');
     const matriz = [];
@@ -81,6 +83,9 @@ async function leerCSV() {
     const expVariance = explainedVariance(valoresPropios);
     console.log("\n9. Vector de Inercia: Porcentaje de varianza explicada por cada componente");
     console.log(expVariance);
+    const endTime = Date.now();
+    const timeElapsed = endTime - startTime; // in milliseconds
+    console.log("Tiempo de ejecucion: "+timeElapsed)
 }
 
 function calcAvg(matriz) {
